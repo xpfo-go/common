@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-31
+
+### Added
+- New `config` module for configuration loading and validation:
+  - `LoadFile/LoadJSON/LoadYAML`
+  - `ApplyDefaults`
+  - `LoadFromEnv`
+  - `ValidateRequired`
+- New `xerrors` module for structured errors and HTTP status mapping:
+  - `New/Wrap`
+  - `CodeOf/IsCode`
+  - `RegisterHTTPStatus/HTTPStatus`
+- New `cache` module for in-memory cache with TTL + LRU + singleflight:
+  - `Set/Get/Delete/Len`
+  - `GetOrLoad`
+- New `httpx` module for HTTP client with retry and JSON helper:
+  - `NewClient`
+  - `Do`
+  - `JSON`
+- Added design and implementation docs for the module expansion in `docs/superpowers`.
+
+### Changed
+- README module table and quick-start snippet updated for `config/xerrors/cache/httpx`.
+- Added direct dependencies:
+  - `golang.org/x/sync`
+  - `gopkg.in/yaml.v3`
+
 ## [2.0.0] - 2026-03-31
 
 ### Added
