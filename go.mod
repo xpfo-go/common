@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gogf/gf/v2 v2.4.0
-	github.com/gorilla/websocket v1.5.0
+	github.com/gorilla/websocket v1.5.3
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.11.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
