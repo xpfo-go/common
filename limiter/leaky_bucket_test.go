@@ -5,60 +5,36 @@ import (
 	"time"
 )
 
-func TestNewLeakyBucket(t *testing.T) {
-	l := NewLeakyBucket(2, 4)
-	for i := 0; i < 20; i++ {
-		t.Log(time.Now().Format("2006-01-02 15:04:05"), l.Take())
-		time.Sleep(time.Second / 4)
+func TestLeakyBucketTakeDeterministic(t *testing.T) {
+	clock := newFakeClock()
+	bucket := NewLeakyBucket(1, 3)
+	bucket.now = clock.Now
+	bucket.lastTime = clock.Now().UnixNano()
+
+	for i := 0; i < 3; i++ {
+		if !bucket.Take() {
+			t.Fatalf("expected take to succeed before peak, index=%d", i)
+		}
+	}
+	if bucket.Take() {
+		t.Fatalf("expected overflow take to fail when bucket reaches peak")
 	}
 
-}
-
-func TestNewLeakyBucketLimiter(t *testing.T) {
-	type args struct {
-		peakLevel       int
-		currentVelocity int
+	clock.Advance(1 * time.Second)
+	if !bucket.Take() {
+		t.Fatalf("expected one slot available after leaking for 1s")
 	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *LeakyBucket
-		wantErr bool
-	}{
-		{
-			name: "60",
-			args: args{
-				peakLevel:       60,
-				currentVelocity: 10,
-			},
-			want: nil,
-		},
+	if bucket.Take() {
+		t.Fatalf("expected bucket to be full again after immediate extra take")
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			l := NewLeakyBucket(int64(tt.args.currentVelocity), int64(tt.args.peakLevel))
-			successCount := 0
-			for i := 0; i < tt.args.peakLevel; i++ {
-				if l.Take() {
-					successCount++
-				}
-			}
-			if successCount != tt.args.peakLevel {
-				t.Errorf("NewLeakyBucketLimiter() got = %v, want %v", successCount, tt.args.peakLevel)
-				return
-			}
 
-			successCount = 0
-			for i := 0; i < tt.args.peakLevel; i++ {
-				if l.Take() {
-					successCount++
-				}
-				time.Sleep(time.Second / 10)
-			}
-			if successCount != tt.args.peakLevel-tt.args.currentVelocity {
-				t.Errorf("NewLeakyBucketLimiter() got = %v, want %v", successCount, tt.args.peakLevel-tt.args.currentVelocity)
-				return
-			}
-		})
+	clock.Advance(3 * time.Second)
+	for i := 0; i < 3; i++ {
+		if !bucket.Take() {
+			t.Fatalf("expected leak to clear bucket, index=%d", i)
+		}
+	}
+	if bucket.Take() {
+		t.Fatalf("expected overflow take to fail after re-filling to peak")
 	}
 }

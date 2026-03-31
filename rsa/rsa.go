@@ -5,109 +5,100 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
+	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
 )
 
-func Generate(bits int) {
-	//get current path
-	_, currentPath, _, _ := runtime.Caller(0)
-	currentPath = filepath.Dir(currentPath)
+func Generate(bits int) error {
+	if bits <= 0 {
+		return errors.New("bits must be greater than 0")
+	}
 
-	//----------------------------------------------private key
+	privateKey, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		return fmt.Errorf("generate rsa key: %w", err)
+	}
 
-	// GenerateKey generates an RSA keypair of the given bit size using the
-	// random source random (for example, crypto/rand.Reader).
-	privateKey, _ := rsa.GenerateKey(rand.Reader, bits)
-
-	//serialize private key to ASN.1 der by x509.MarshalPKCS1PrivateKey
 	x509PrivateKey := x509.MarshalPKCS1PrivateKey(privateKey)
-
-	//encode x509 to pem and save to file
-	//1. create private file
-	privateKeyFile, err := os.Create(currentPath + "/private_key.pem")
+	privateKeyFile, err := os.Create("private_key.pem")
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("create private key file: %w", err)
 	}
 	defer func() { _ = privateKeyFile.Close() }()
-	//2. new a pem block struct object
-	privateKeyBlock := pem.Block{
-		Type:    "RSA Private Key",
-		Headers: nil,
-		Bytes:   x509PrivateKey,
+
+	privateKeyBlock := pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509PrivateKey}
+	if err := pem.Encode(privateKeyFile, &privateKeyBlock); err != nil {
+		return fmt.Errorf("encode private key pem: %w", err)
 	}
-	//3. save to file
-	_ = pem.Encode(privateKeyFile, &privateKeyBlock)
 
-	//----------------------------------------------public key
-
-	//get public key
-	publicKey := privateKey.PublicKey
-	//serialize public key to ASN.1 der by x509.MarshalPKCS1PublicKey
-	x509PublicKey, _ := x509.MarshalPKIXPublicKey(&publicKey)
-
-	//encode x509 to pem and save to file
-	//1. create public key file
-	publicKeyFile, err := os.Create(currentPath + "/public_key.pem")
+	x509PublicKey, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("marshal public key: %w", err)
+	}
+	publicKeyFile, err := os.Create("public_key.pem")
+	if err != nil {
+		return fmt.Errorf("create public key file: %w", err)
 	}
 	defer func() { _ = publicKeyFile.Close() }()
 
-	//2. new a pem block struct object
-	publicKeyBlock := pem.Block{
-		Type:    "RSA Public Key",
-		Headers: nil,
-		Bytes:   x509PublicKey,
+	publicKeyBlock := pem.Block{Type: "PUBLIC KEY", Bytes: x509PublicKey}
+	if err := pem.Encode(publicKeyFile, &publicKeyBlock); err != nil {
+		return fmt.Errorf("encode public key pem: %w", err)
 	}
 
-	//3. save to file
-	_ = pem.Encode(publicKeyFile, &publicKeyBlock)
+	return nil
 }
 
-// Encrypt publicKeyPath 传错了会panic
-func Encrypt(plainText []byte, publicKeyPath string) []byte {
-	publicKeyFile, _ := os.Open(publicKeyPath)
+func Encrypt(plainText []byte, publicKeyPath string) ([]byte, error) {
+	publicKeyBytes, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("read public key: %w", err)
+	}
 
-	defer func() { _ = publicKeyFile.Close() }()
+	publicKeyDecodeBlock, _ := pem.Decode(publicKeyBytes)
+	if publicKeyDecodeBlock == nil {
+		return nil, errors.New("decode public key pem failed")
+	}
 
-	publicKeyFileInfo, _ := publicKeyFile.Stat()
+	publicKeyInterface, err := x509.ParsePKIXPublicKey(publicKeyDecodeBlock.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse public key: %w", err)
+	}
 
-	//1. make size
-	buf := make([]byte, publicKeyFileInfo.Size())
-	//2. read file to buf
-	_, _ = publicKeyFile.Read(buf)
-	//3. decode pem
-	publicKeyDecodeBlock, _ := pem.Decode(buf)
-	//4. x509 decode
-	publicKeyInterface, _ := x509.ParsePKIXPublicKey(publicKeyDecodeBlock.Bytes)
+	publicKey, ok := publicKeyInterface.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("public key is not rsa")
+	}
 
-	//assert
-	publicKey := publicKeyInterface.(*rsa.PublicKey)
+	cipherText, err := rsa.EncryptPKCS1v15(rand.Reader, publicKey, plainText)
+	if err != nil {
+		return nil, fmt.Errorf("encrypt plain text: %w", err)
+	}
 
-	//encrypt plainText
-	cipherText, _ := rsa.EncryptPKCS1v15(rand.Reader, publicKey, plainText)
-
-	return cipherText
+	return cipherText, nil
 }
 
-// Decrypt privateKeyPath 传得不对会panic 解密出问题会返回 空[]byte
-func Decrypt(cipherText []byte, privateKeyPath string) []byte {
+func Decrypt(cipherText []byte, privateKeyPath string) ([]byte, error) {
+	privateKeyBytes, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("read private key: %w", err)
+	}
 
-	privateKeyFile, _ := os.Open(privateKeyPath)
+	privateKeyBlock, _ := pem.Decode(privateKeyBytes)
+	if privateKeyBlock == nil {
+		return nil, errors.New("decode private key pem failed")
+	}
 
-	defer func() { _ = privateKeyFile.Close() }()
+	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse private key: %w", err)
+	}
 
-	privateKeyInfo, _ := privateKeyFile.Stat()
-	buf := make([]byte, privateKeyInfo.Size())
-	_, _ = privateKeyFile.Read(buf)
-	//pem decode
-	privateKeyBlock, _ := pem.Decode(buf)
-	//X509 decode
-	privateKey, _ := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
+	plainText, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, cipherText)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt cipher text: %w", err)
+	}
 
-	plainText, _ := rsa.DecryptPKCS1v15(rand.Reader, privateKey, cipherText)
-
-	return plainText
+	return plainText, nil
 }

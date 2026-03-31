@@ -38,17 +38,11 @@ func (c *Client) Write() {
 		_ = c.conn.Close()
 	}()
 
-	for {
-		select {
-		case msg, ok := <-c.message:
-			if !ok {
-				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-			if err := c.conn.WriteMessage(msg.dataType, msg.data); err != nil {
-				return
-			}
+	for msg := range c.message {
+		if err := c.conn.WriteMessage(msg.dataType, msg.data); err != nil {
+			return
 		}
 	}
 
+	_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 }

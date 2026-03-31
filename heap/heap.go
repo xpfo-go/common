@@ -9,7 +9,7 @@ func NewHeap[T any](v []T, comparator func(a, b T) bool) *pHeap[T] {
 	}
 
 	th := &pHeap[T]{heap: &h[T]{comparator: comparator}}
-	if v != nil && len(v) != 0 {
+	if len(v) != 0 {
 		th.heap.values = v
 	}
 

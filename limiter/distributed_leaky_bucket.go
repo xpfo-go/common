@@ -2,32 +2,38 @@ package limiter
 
 import (
 	"context"
+	_ "embed"
+	"errors"
 	"github.com/go-redis/redis/v8"
-	"io"
-	"os"
-	"sync"
 	"time"
 )
 
-var leakyBucketLua = ""
-var dlOnce sync.Once
+//go:embed d_leaky_bucket.lua
+var leakyBucketLua string
 
-func init() {
-	dlOnce.Do(func() {
-		f, err := os.Open("./d_leaky_bucket.lua")
-		if err != nil {
-			panic(err)
-		}
-		bs, err := io.ReadAll(f)
-		if err != nil {
-			panic(err)
-		}
-		leakyBucketLua = string(bs)
-	})
-}
+func NewDLeakyBucket(redisKey string, rate, peak int, redisClient *redis.Client) (*DLeakyBucket, error) {
+	if redisKey == "" {
+		return nil, errors.New("redisKey cannot be empty")
+	}
+	if rate <= 0 {
+		return nil, errors.New("rate must be greater than 0")
+	}
+	if peak <= 0 {
+		return nil, errors.New("peak must be greater than 0")
+	}
+	if redisClient == nil {
+		return nil, errors.New("redisClient cannot be nil")
+	}
+	if leakyBucketLua == "" {
+		return nil, errors.New("leaky bucket lua script is empty")
+	}
 
-func NewDLeakyBucket(redisKey string, rate, peak int, redisClient *redis.Client) *DLeakyBucket {
-	return &DLeakyBucket{redisKey: redisKey, rate: rate, peak: peak, redisClient: redisClient}
+	return &DLeakyBucket{
+		redisKey:    redisKey,
+		rate:        rate,
+		peak:        peak,
+		redisClient: redisClient,
+	}, nil
 }
 
 type DLeakyBucket struct {

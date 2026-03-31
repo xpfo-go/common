@@ -1,6 +1,6 @@
-module github.com/xpfo-go/common
+module github.com/xpfo-go/common/v2
 
-go 1.19
+go 1.22
 
 require (
 	github.com/beego/beego/v2 v2.0.7

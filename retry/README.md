@@ -22,7 +22,7 @@ const maxRetryCount = 3
 ``` go
 package main
 
-import "github.com/xpfo-go/common/retry"
+import "github.com/xpfo-go/common/v2/retry"
 
 func main(){
     if err := retry.ExecFuncWithRetry(func() (err error) {

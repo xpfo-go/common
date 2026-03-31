@@ -2,33 +2,38 @@ package limiter
 
 import (
 	"context"
+	_ "embed"
+	"errors"
 	"github.com/go-redis/redis/v8"
-	"io"
-	"os"
-	"sync"
 	"time"
 )
 
-// args RedisKey 生成速度 容量 当前时间戳
-var tokenBucketLua = ""
-var dtOnce sync.Once
+//go:embed d_token_bucket.lua
+var tokenBucketLua string
 
-func init() {
-	dtOnce.Do(func() {
-		f, err := os.Open("./d_token_bucket.lua")
-		if err != nil {
-			panic(err)
-		}
-		bs, err := io.ReadAll(f)
-		if err != nil {
-			panic(err)
-		}
-		tokenBucketLua = string(bs)
-	})
-}
+func NewDTokenBucket(redisKey string, rate, cap int, redisClient *redis.Client) (*DTokenBucket, error) {
+	if redisKey == "" {
+		return nil, errors.New("redisKey cannot be empty")
+	}
+	if rate <= 0 {
+		return nil, errors.New("rate must be greater than 0")
+	}
+	if cap <= 0 {
+		return nil, errors.New("cap must be greater than 0")
+	}
+	if redisClient == nil {
+		return nil, errors.New("redisClient cannot be nil")
+	}
+	if tokenBucketLua == "" {
+		return nil, errors.New("token bucket lua script is empty")
+	}
 
-func NewDTokenBucket(redisKey string, rate, cap int, redisClient *redis.Client) *DTokenBucket {
-	return &DTokenBucket{redisKey: redisKey, rate: rate, cap: cap, redisClient: redisClient}
+	return &DTokenBucket{
+		redisKey:    redisKey,
+		rate:        rate,
+		cap:         cap,
+		redisClient: redisClient,
+	}, nil
 }
 
 type DTokenBucket struct {
