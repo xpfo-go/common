@@ -3,7 +3,7 @@
 [![CI](https://github.com/xpfo-go/common/actions/workflows/ci.yml/badge.svg)](https://github.com/xpfo-go/common/actions/workflows/ci.yml)
 [![Release](https://github.com/xpfo-go/common/actions/workflows/release.yml/badge.svg)](https://github.com/xpfo-go/common/actions/workflows/release.yml)
 
-`common` 是一个 Go 工具组件集合，包含加密、限流、数据结构、日志、重试与 WebSocket 管理等模块。
+`common` 是一个 Go 工具组件集合，包含配置加载、错误模型、缓存、HTTP 客户端、加密、限流、数据结构、日志、重试与 WebSocket 管理等模块。
 
 ## Installation
 
@@ -17,6 +17,12 @@ go get github.com/xpfo-go/common/v2@latest
 
 ```go
 import (
+    "context"
+    "net/http"
+    "time"
+
+    "github.com/xpfo-go/common/v2/cache"
+    "github.com/xpfo-go/common/v2/httpx"
     "github.com/xpfo-go/common/v2/limiter"
     rsautil "github.com/xpfo-go/common/v2/rsa"
 )
@@ -28,6 +34,14 @@ func example() error {
     if err := rsautil.Generate(2048); err != nil {
         return err
     }
+
+    c := cache.New(cache.Options{Capacity: 100, DefaultTTL: time.Minute})
+    defer c.Close()
+    c.Set("k", "v", 0)
+
+    hc := httpx.NewClient(httpx.Options{Timeout: 2 * time.Second, Retry: 2})
+    req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+    _, _ = hc.Do(context.Background(), req)
     return nil
 }
 ```
@@ -37,8 +51,11 @@ func example() error {
 | Module | Description | Doc |
 | --- | --- | --- |
 | `aes` | AES 加解密工具 | `aes/aes_test.go` |
+| `cache` | 内存缓存（TTL + LRU + singleflight） | `cache/cache_test.go` |
+| `config` | 配置加载（JSON/YAML、默认值、环境变量覆盖、required） | `config/config_test.go` |
 | `gis` | GIS 相关工具 | [gis/README.md](gis/README.md) |
 | `heap` | 堆结构 | [heap/README.md](heap/README.md) |
+| `httpx` | 统一超时/重试/JSON 编解码的 HTTP 客户端 | `httpx/client_test.go` |
 | `limiter` | 本地/分布式限流器（令牌桶、漏桶） | `limiter/*_test.go` |
 | `logs` | zap + lumberjack 日志封装 | `logs/logs_test.go` |
 | `queue` | 队列实现 | [queue/README.md](queue/README.md) |
@@ -46,6 +63,7 @@ func example() error {
 | `rsa` | RSA 密钥生成与加解密 | `rsa/rsa_test.go` |
 | `stack` | 栈结构 | [stack/README.md](stack/README.md) |
 | `websockets` | WebSocket 连接管理 | [websockets/README.md](websockets/README.md) |
+| `xerrors` | 错误码与包装、HTTP 状态码映射 | `xerrors/error_test.go` |
 
 ## Breaking Changes in v2.0.0
 
