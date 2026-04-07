@@ -3,7 +3,7 @@ module github.com/xpfo-go/common/v2
 go 1.25.0
 
 require (
-	github.com/beego/beego/v2 v2.3.9
+	github.com/beego/beego/v2 v2.3.10
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gogf/gf/v2 v2.10.0
